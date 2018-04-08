@@ -15,7 +15,7 @@
 
 ;; dependencies
 ;(sys:load "libs/external/portmidi.xtm")
-(sys:load "libs/external/midi_input.xtm")
+;(sys:load "libs/external/midi_input.xtm")
 
 
 ;;;;;;;;;;;;;;;;;;;;; command line argument parsing ;;;;;;;;;;;;;;;;;;;;
@@ -40,83 +40,83 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; MIDI Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;; Some helpful functions for using MIDI devices by name ;;;
-(bind-func midi_input_port_id:[i32,i8*]*
-  (lambda (port_name)
-    (let* ((n:i32 (Pm_CountDevices))
-           (loop:[i32,i32]*
-            (lambda (i:i32)
-              (cond
-               ((and (<= (i64toi32 0) i) (< i n))
-                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
-                       (name:i8* (tref info 2))
-                       (input:bool (= (i64toi32 1) (tref info 3)))
-                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
-                  (cond
-                   ((and input (= (i64toi32 0) (strncmp name port_name c))) i)
-                   (else
-                    (loop (+ i (i64toi32 1)))))))
-               (else
-                ;;(printf "No MIDI input port found with name %s\n" port_name)
-                (atoi port_name)
-                )))))
-        (loop (i64toi32 0)))))
+;; (bind-func midi_input_port_id:[i32,i8*]*
+;;   (lambda (port_name)
+;;     (let* ((n:i32 (Pm_CountDevices))
+;;            (loop:[i32,i32]*
+;;             (lambda (i:i32)
+;;               (cond
+;;                ((and (<= (i64toi32 0) i) (< i n))
+;;                 (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+;;                        (name:i8* (tref info 2))
+;;                        (input:bool (= (i64toi32 1) (tref info 3)))
+;;                        (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+;;                   (cond
+;;                    ((and input (= (i64toi32 0) (strncmp name port_name c))) i)
+;;                    (else
+;;                     (loop (+ i (i64toi32 1)))))))
+;;                (else
+;;                 ;;(printf "No MIDI input port found with name %s\n" port_name)
+;;                 (atoi port_name)
+;;                 )))))
+;;         (loop (i64toi32 0)))))
 
 
-(bind-func midi_output_port_id:[i32,i8*]*
-  (lambda (port_name)
-    (let* ((n:i32 (Pm_CountDevices))
-           (loop:[i32,i32]*
-            (lambda (i:i32)
-              (cond
-               ((and (<= (i64toi32 0) i) (< i n))
-                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
-                       (name:i8* (tref info 2))
-                       (output:bool (= (i64toi32 1) (tref info 4)))
-                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
-                  (cond
-                   ((and output (= (i64toi32 0) (strncmp name port_name c))) i)
-                   (else
-                    (loop (+ i (i64toi32 1)))))))
-               (else
-                ;;(printf "No MIDI output port found with name %s\n" port_name)
-                (atoi port_name))))))
-        (loop (i64toi32 0)))))
+;; (bind-func midi_output_port_id:[i32,i8*]*
+;;   (lambda (port_name)
+;;     (let* ((n:i32 (Pm_CountDevices))
+;;            (loop:[i32,i32]*
+;;             (lambda (i:i32)
+;;               (cond
+;;                ((and (<= (i64toi32 0) i) (< i n))
+;;                 (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+;;                        (name:i8* (tref info 2))
+;;                        (output:bool (= (i64toi32 1) (tref info 4)))
+;;                        (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+;;                   (cond
+;;                    ((and output (= (i64toi32 0) (strncmp name port_name c))) i)
+;;                    (else
+;;                     (loop (+ i (i64toi32 1)))))))
+;;                (else
+;;                 ;;(printf "No MIDI output port found with name %s\n" port_name)
+;;                 (atoi port_name))))))
+;;         (loop (i64toi32 0)))))
 
 
-(bind-func print_midi_port_info:[void,i32]*
-  (lambda (id)
-    (let ((info:PmDeviceInfo* (Pm_GetDeviceInfo id)))
-      (print info)
-      void)))
+;; (bind-func print_midi_port_info:[void,i32]*
+;;   (lambda (id)
+;;     (let ((info:PmDeviceInfo* (Pm_GetDeviceInfo id)))
+;;       (print info)
+;;       void)))
 
 
-(define midi-out-port-id
-  (if (cmd-arg-true "midi-out")
-      (let* ((value (sys:cmdarg "midi-out"))
-             (id (midi_output_port_id value)))
-        (if (<= 0 id) id (string->number value)))
-      1))
+;; (define midi-out-port-id
+;;   (if (cmd-arg-true "midi-out")
+;;       (let* ((value (sys:cmdarg "midi-out"))
+;;              (id (midi_output_port_id value)))
+;;         (if (<= 0 id) id (string->number value)))
+;;       1))
 
 
-(define midi-in-port-id
-  (if (cmd-arg-true "midi-in")
-      (let* ((value (sys:cmdarg "midi-in"))
-             (id (midi_input_port_id value)))
-        (if (<= 0 id) id (string->number value)))
-      1))
+;; (define midi-in-port-id
+;;   (if (cmd-arg-true "midi-in")
+;;       (let* ((value (sys:cmdarg "midi-in"))
+;;              (id (midi_input_port_id value)))
+;;         (if (<= 0 id) id (string->number value)))
+;;       1))
 
 
-(define (print-midi-setup)
-  (print "MIDI out port is device number ")
-  (print midi-out-port-id) (print " ")
-  (print_midi_port_info midi-out-port-id)
-  (println)
-  (print "MIDI in  port is device number ")
-  (print midi-in-port-id) (print " ")
-  (print_midi_port_info midi-in-port-id)
-  (println))
+;; (define (print-midi-setup)
+;;   (print "MIDI out port is device number ")
+;;   (print midi-out-port-id) (print " ")
+;;   (print_midi_port_info midi-out-port-id)
+;;   (println)
+;;   (print "MIDI in  port is device number ")
+;;   (print midi-in-port-id) (print " ")
+;;   (print_midi_port_info midi-in-port-id)
+;;   (println))
 
-(print-midi-setup)
+;; (print-midi-setup)
 
 
 ;; midi initialization first!
@@ -703,7 +703,6 @@
   (lambda (beat dur)
     (let ((den (current_density))
           (cimDen (get-CIM-density)))
-<<<<<<< HEAD
       (cond
        ((< 0 (note_buffer_length)) 
         (if (< den 0.5)
