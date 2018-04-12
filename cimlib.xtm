@@ -27,6 +27,9 @@
  (sys:load "libs/external/portmidi.xtm"))
 (impc:aot:insert-forms (sys:load "libs/external/portmidi.xtm"))
 
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/rational.xtm"))
+(impc:aot:insert-forms (sys:load "libs/core/rational.xtm"))
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/math.xtm"))
@@ -52,7 +55,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-type CIMf64Array <i64,double*> (printer? . #f))
+(bind-type CIMf64Array <i64,double*>)
 
 (bind-func cim_f64_create
   (lambda (size)
@@ -81,7 +84,7 @@
     (let ((v:double* (halloc size)))
       (CIMf64Array size v))))
 
-(bind-type CIMi64Array <i64,i64*> (printer? . #f))
+(bind-type CIMi64Array <i64,i64*>)
 
 (bind-func cim_i64_create
   (lambda (size)
@@ -435,6 +438,42 @@
     (if (null? key) 0
         (tref key 1))))
 
+(bind-func pc_letter_name:[String*,i64]*
+  (lambda (n)
+    (let ((pc (modulo n 12)))
+      (cond
+       ((= pc 1) (Str "C#"))
+       ((= pc 2) (Str "D"))
+       ((= pc 3) (Str "Eb"))
+       ((= pc 4) (Str "E"))
+       ((= pc 5) (Str "F"))
+       ((= pc 6) (Str "F#"))
+       ((= pc 7) (Str "G"))
+       ((= pc 8) (Str "Ab"))
+       ((= pc 9) (Str "A"))
+       ((= pc 10) (Str "Bb"))
+       ((= pc 11) (Str "B"))
+       (else (Str "C"))))))
+
+(bind-func toString:[String*,CIMKey*]*
+  (lambda (key)
+    (if (cim_key_major key)
+        (cat2 (pc_letter_name (cim_key_root key)) (Str "-Maj"))
+        (cat2 (pc_letter_name (cim_key_root key)) (Str "-min")))))
+
+
+(bind-func toString:[String*,CIMKey]*
+  (lambda (key)
+    (if (tref key 1)
+        (cat2 (pc_letter_name (tref key 0)) (Str "-Maj"))
+        (cat2 (pc_letter_name (tref key 0)) (Str "-min")))))
+
+
+(bind-func print:[void,CIMKey*]*
+  (lambda (key)
+    (printf "%s" (cstr key))
+    void))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -452,7 +491,7 @@
     (if (> (+ 1 idx) CIM_GLOBAL_MAX_SECTION)
         (set! CIM_GLOBAL_MAX_SECTION (+ 1 idx)))
     (if (>= idx 100)
-        (begin (println "ERR: Global Seciton Max = 100!") void)
+        (begin (println "ERR: Global Section Max = 100!") void)
         (let ((sect (aref-ptr CIM_GLOBAL_SECTIONS idx))
               (key (tref-ptr sect 1)))
           (tfill! key root maj_min)
@@ -463,14 +502,14 @@
 (bind-func get_cim_section_bpm
   (lambda (idx)
     (if (>= idx 100)
-        (begin (println "ERR: Global Seciton Max = 100!") -1.0)
+        (begin (println "ERR: Global Section Max = 100!") -1.0)
         (let ((sect (aref-ptr CIM_GLOBAL_SECTIONS idx)))
           (tref sect 2)))))
 
 (bind-func get_cim_section_key
   (lambda (idx)
     (if (>= idx 100)
-        (begin (println "ERR: Global Seciton Max = 100!") null)
+        (begin (println "ERR: Global Section Max = 100!") null)
         (let ((sect (aref-ptr CIM_GLOBAL_SECTIONS idx)))
           (tref-ptr sect 1)))))
 
@@ -478,7 +517,7 @@
   (lambda ()
     (if (or (>= CIM_GLOBAL_CURRENT_SECTION 100)
             (> CIM_GLOBAL_CURRENT_SECTION CIM_GLOBAL_MAX_SECTION))
-        (begin (println "ERR: Global Seciton Max = " CIM_GLOBAL_MAX_SECTION " and absolute max is 100") void)
+        (begin (println "ERR: Global Section Max = " CIM_GLOBAL_MAX_SECTION " and absolute max is 100") void)
         (let ((sect (aref-ptr CIM_GLOBAL_SECTIONS CIM_GLOBAL_CURRENT_SECTION))
               (key (tref-ptr sect 1)))
           (set! CIM_GLOBAL_BPM (tref sect 2))
@@ -488,6 +527,21 @@
           (println "Initializing BPM:" CIM_GLOBAL_BPM "in" (tref CIM_GLOBAL_KEY 0)
                    (if (tref CIM_GLOBAL_KEY 1) "major" "minor"))
           void))))
+
+
+(bind-func toString:[String*,CIMSection]*
+  (lambda (section)
+    (cat (Str "[ sec# ") (format (tref section 0)) (Str " - ") (Str "  ") (format (tref section 2)) (Str " bpm ]"))))
+    
+(bind-func generic_print:[void,!a]*
+  (lambda (obj)
+    (printf "%s" (cstr obj))
+    void))
+
+(bind-func print:[void,CIMSection*]*
+  (lambda (section)
+    (generic_print section)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -867,20 +921,50 @@
       (tset! cimkey 1 majmin)
       note)))
 
-(bind-func print:[void,CIMNote*]*
+
+(bind-func toString:[String*,Rational]*
+  (lambda (a:Rational)
+    (let ((str:i8* (salloc 256))
+          (reduced (Rational_reduce a)))
+      (sprintf str "%lld/%lld" (tref reduced 0) (tref reduced 1))
+      (String str))))
+
+
+;; (bind-func toString:[String*,CIMNote*]*
+;;   (lambda (note)
+;;     (if (null? note)
+;;         (Str "<NOTE: NULL>")
+;;         (cat
+;;          (Str "<NOTE: ") ;;(format (cim_note_index note))
+;;          (Str " onset: ") ;;(format (cim_note_onset note))
+;;          (Str " dur: ") ;;(format (cim_note_duration note))
+;;          (Str " pitch: ") ;;(format (cim_note_pitch note))
+;;          (Str " vol: ") ;;(format (cim_note_volume note))
+;;          ;;(Str " beats: ") (toString (cim_note_beats note))
+;;          (Str " bpm: ") ;;(toString (cim_note_bpm note))
+;;          ;;(Str " key: ") (toString (cim_note_key note))
+;;          ))))
+
+(bind-func toString:[String*,CIMNote*]*
   (lambda (note)
     (if (null? note)
-        (printout "<NOTE: NULL>")
-        (printout "<NOTE: " (cim_note_index note)
-                  " onset: " (cim_note_onset note)
-                  " dur: " (cim_note_duration note)
-                  " pitch: " (cim_note_pitch note)
-                  " vol: " (cim_note_volume note)
-                  " beats: " (cim_note_beats note)
-                  " bpm: " (cim_note_bpm note)
-                  " key: " (cim_note_key note)
-                  ">"))
-    void))
+        (Str "<NOTE: NULL>")
+        (let ((str:i8* (salloc 256)))
+          (sprintf str "< NOTE: %lld  onset: %f  dur:  %f  pitch: %f  vol: %f  beats: %s  bpm: %f  key: %s >"
+                   (format (cim_note_index note)) 
+                   (format (cim_note_onset note))
+                   (format (cim_note_duration note))
+                   (format (cim_note_pitch note))
+                   (format (cim_note_volume note))
+                   (cstr (cim_note_beats note))
+                   (format (cim_note_bpm note))
+                   (cstr (cim_note_key note)))
+          (String str)))))
+
+
+(bind-func print:[void,CIMNote*]*
+  (lambda (note)
+    (generic_print note)))
 
 (bind-func retrieve_note
   (lambda (idx)
@@ -919,9 +1003,9 @@
   (lambda ()
     (println "---- Note Closures ----")
     (doloop (i CIMNoteBufferIdx)
-      (printout (aref CIMNoteGlobalClosureBuffer i))
+      (print (aref CIMNoteGlobalClosureBuffer i))
       (if (< i (- CIMNoteBufferIdx 1))
-          (printout ", ")
+          (print ", ")
           (println "")))
     void))
 
@@ -930,9 +1014,9 @@
   (lambda ()
    (println "---- High Closure Candidates ----")
     (doloop (i CIMHighClosureIndicesCount)
-      (printout (aref CIMHighClosureIndices  i))
+      (print (aref CIMHighClosureIndices  i))
       (if (< i (- CIMHighClosureIndicesCount 1))
-          (printout ", ")
+          (print ", ")
           (println "")))
     void))
 
@@ -1166,24 +1250,29 @@
       (modulo onset 1.0))))
            
           
+(bind-func toString:[String*,CIMChunk*]*
+  (lambda (chunk)
+    (if (null? chunk)
+        (String "< CHUNK: NULL >")
+        (let ((str:i8* (alloc 256)))
+          (sprintf str "< CHUNK | valid: %ld  start: %f (index: %lld)  end: %f (index: %lld)  notes: %lld  onset: %f  bpm: %f  key: %s  homo: %d %%  dur: %f >"
+                   (i1toi32 (cim_chunk_valid chunk))
+                   (cim_note_onset (cim_chunk_start chunk))
+                   (cim_note_index (cim_chunk_start chunk))
+                   (cim_note_onset (cim_chunk_end chunk))
+                   (cim_note_index (cim_chunk_end chunk))
+                   (cim_chunk_size chunk)
+                   (cim_chunk_onset chunk)
+                   (cstr (cim_chunk_key chunk))
+                   (dtoi64 (* 100. (cim_chunk_homophonic chunk)))
+                   (cim_chunk_duration chunk))
+          (String str)))))
 
 
 (bind-func print:[void,CIMChunk*]*
   (lambda (chunk)
-    (if (null? chunk)
-        (printout "<CHUNK: NULL>")
-        (begin
-          (printout "<CHUNK: valid: " (cim_chunk_valid chunk)) ;; " onset: " (cim_note_onset (cim_chunk_start chunk)))
-          (printout "\nstart  : " (cim_note_onset (cim_chunk_start chunk)) " idx: " (cim_note_index (cim_chunk_start chunk)))
-          (printout "\nend    : " (cim_note_onset (cim_chunk_end chunk)) " idx: " (cim_note_index (cim_chunk_end chunk)))
-          (printout "\nnotes  : " (cim_chunk_size chunk))
-          (printout "\nonset  : " (cim_chunk_onset chunk))
-          (printout "\nbpm    : " (cim_chunk_bpm chunk))
-          (printout "\nkey    : " (cim_key_root (cim_chunk_key chunk)) " maj? " (cim_key_major (cim_chunk_key chunk)))
-          (printout "\nhomo   : " (dtoi64 (* 100. (cim_chunk_homophonic chunk))) " %")
-          (printout "\ndur    : " (cim_chunk_duration chunk) ">")))
-    void))
-
+    (generic_print chunk)))
+                   
 
 (bind-func scheme-chunk-print:[void,i8*]*
   (lambda (ptr)
@@ -1292,6 +1381,24 @@
       )))
 
 
+(bind-func dmin:[double,double,double]*
+  (lambda (a b)
+    (if (< a b) a b)))
+
+(bind-func i64min:[i64,i64,i64]*
+  (lambda (a b)
+    (if (< a b) a b)))
+
+(bind-func dmax:[double,double,double]*
+  (lambda (a b)
+    (if (> a b) a b)))
+
+(bind-func i64max:[i64,i64,i64]*
+  (lambda (a b)
+    (if (> a b) a b)))
+
+
+
 ;; Zeroth order closure - longer and more tonally stable = more closed
 ;; NOTE that this function is different to those that follow, in that it matters
 ;; *when* this function is called. It is only needed when there is only a
@@ -1302,7 +1409,7 @@
            (gap:double (- currentTime onset_x))
            (t1:double
             (if (< 0.0 CIMDefaultGapSize)
-                (min (/ gap CIMDefaultGapSize) 1.0)
+                (dmin (/ gap CIMDefaultGapSize) 1.0)
                 1.0))
            (t2:double 0.0)
            (t3:double (metric_weight onset_x))
@@ -1317,11 +1424,11 @@
            (gap:double (- currentTime onset_x))
            (t1:double
             (if (< 0.0 CIMDefaultGapSize)
-                (min (/ gap CIMDefaultGapSize) 1.0)
+                (dmin (/ gap CIMDefaultGapSize) 1.0)
                 1.0))
            (t2:double 0.0)
-           (t3:double (max (- (metric_weight onset_x) (metric_weight onset_n)) 0.0))
-           (t4:double (max (- (tonal_stability x (cim_note_key x)) (tonal_stability n (cim_note_key x))) 0.0)))
+           (t3:double (dmax (- (metric_weight onset_x) (metric_weight onset_n)) 0.0))
+           (t4:double (dmax (- (tonal_stability x (cim_note_key x)) (tonal_stability n (cim_note_key x))) 0.0)))
           (/ (+ t1 t2 t3 t4) 4.0))))
 
 
@@ -1332,7 +1439,7 @@
            (gap:double (- onset_s onset_x))
            (t1:double
             (if (< 0.0 CIMDefaultGapSize)
-                (min (/ gap CIMDefaultGapSize) 1.0)
+                (dmin (/ gap CIMDefaultGapSize) 1.0)
                 1.0))
            (t2:double 0.0)
            (t3:double (metric_weight onset_x))
@@ -1350,15 +1457,15 @@
            (gap:double (- onset_s onset_x))
            (t1:double
             (if (< 0.0 CIMDefaultGapSize)
-                (min (/ gap CIMDefaultGapSize) 1.0)
+                (dmin (/ gap CIMDefaultGapSize) 1.0)
                 1.0))
            (t2:double
             (/ (if (< 0.0 ioi1)
-                   (min (/ ioi2 ioi1) 4.0)
+                   (dmin (/ ioi2 ioi1) 4.0)
                    4.0)
                4.0))
-           (t3:double (max (- (metric_weight onset_x) (metric_weight onset_n)) 0.0))
-           (t4:double (max (- (tonal_stability x (cim_note_key x)) (tonal_stability n (cim_note_key x))) 0.0)))
+           (t3:double (dmax (- (metric_weight onset_x) (metric_weight onset_n)) 0.0))
+           (t4:double (dmax (- (tonal_stability x (cim_note_key x)) (tonal_stability n (cim_note_key x))) 0.0)))
       (/ (+ t1 t2 t3 t4) 4.0))))
 
 
@@ -1420,8 +1527,6 @@
       (is_good_end_note:[bool,CIMNote*,CIMNote*,CIMNote*,double]* note_n note_x note_s currentTime))))
 
 
-
-
 (bind-func update_closures:[i64,i64,double]*
   (lambda (index:i64 currentTime:double)
     (let ((note_n (retrieve_note (- index 1)))
@@ -1448,7 +1553,7 @@
 (update_closures 0 (cim_current_time))
 (dump_note_closures)
 (dump_high_closure_candidates)
-($ (print (retrieve_note 6)))
+;($ (print (retrieve_note 6)))
 
 
 ;;;;;;;;;; TODO finish implementing ;;;;;;;
@@ -1506,10 +1611,10 @@
       (tset! chunk 0 #f)
       (cond
        ((< 0 CIMNoteBufferIdx)
-        (set! CIMGlobalLastChunkCandidateIndex (max 0 (min (+ CIMGlobalLastChunkCandidateIndex (dtoi64 (round (* CIMGlobalPhraseInertiaSpread (randnd))))) (- CIMGlobalGoodStartNotesCount 1))))
+        (set! CIMGlobalLastChunkCandidateIndex (i64max 0 (i64min (+ CIMGlobalLastChunkCandidateIndex (dtoi64 (round (* CIMGlobalPhraseInertiaSpread (randnd))))) (- CIMGlobalGoodStartNotesCount 1))))
         (let ((startIndex:i64
                (if (and (< 0 CIMGlobalLastChunkCandidateIndex) (< CIMGlobalLastChunkCandidateIndex CIMGlobalGoodStartNotesCount))
-                   (min (+ (aref CIMGlobalGoodStartNotes CIMGlobalLastChunkCandidateIndex) 0) CIMNoteBufferIdx)
+                   (i64min (+ (aref CIMGlobalGoodStartNotes CIMGlobalLastChunkCandidateIndex) 0) CIMNoteBufferIdx)
                    (random_index CIMNoteBufferIdx)))
               (startNote:CIMNote* (retrieve_note startIndex))
               (startOnset:double (cim_note_onset startNote))
@@ -2086,7 +2191,7 @@
 
 
 ;; absolute_time seconds idx type chan a b
-(bind-type MidiMSG <i64,double,i64,i8,i32,i32,i32>)
+(bind-type MidiMSG <i64,double,i64,i8,i32,i32,i32> (printer? . #f))
 (bind-val MidiMSGBuffer |1000000,MidiMSG|)
 (bind-val MidiMSGBufferIdx i64 0)
 (bind-val MidiMSGBufferStartTime i64 0)
@@ -2359,7 +2464,7 @@
 (bind-func print_rhythm_bins
   (lambda ()
     (doloop (i NumRhythmBins)
-      (printout (+ (* i (dtoi64 bpm_mod)) (dtoi64 bpm_low)) "[" (aref rhythmbins i) "],"))
+      (printf " .. %lld [%lld] .. " (+ (* i (dtoi64 bpm_mod)) (dtoi64 bpm_low)) (aref rhythmbins i)))
     (println)))
 
 (bind-func decrement_bins
@@ -2726,7 +2831,7 @@
     (let ((pcs:|12,i64|* (key_analysis.pitchset_hist))
           (i 0))
       (dotimes (i 12)
-        (printout (aref pcs i) ","))
+        (printf "%lld," (aref pcs i)))
       (println "")
       void)))
 
@@ -2746,10 +2851,18 @@
               (* -1 root))))))
 
 
+;; FIXME -- is there an argument missing here (note onset)
 ;; idx, time, phase, bpm, mass (total volume)
-(bind-type CIMTimeSlice <i64,i64,double,double,i64,i64>)
+(bind-type CIMTimeSlice <i64,i64,double,double,i64,i64> (printer? . #f))
 (bind-val CIMTimeSlices |1000000,CIMTimeSlice|)
 (bind-val CIMTimeSliceIdx i64 0)
+
+(bind-func toString:[String*,CIMTimeSlice*]*
+  (lambda (slice)
+    (let ((str:i8* (salloc 256)))
+      (sprintf str "< TimeSlice | index: %lld  time: %lld  phase: %f  bpm: %f  mass: %lld >"
+               (tref slice 0) (tref slice 1) (tref slice 2) (tref slice 3) (tref slice 4))
+      (String str))))
 
 (bind-func cim_tslice_idx
   (lambda (x:CIMTimeSlice*)
@@ -2845,7 +2958,7 @@
           slice
           null))))
 
-(bind-type CIMTimeSliceRange <CIMTimeSlice*,CIMTimeSlice*> (printer? . #f))
+(bind-type CIMTimeSliceRange <CIMTimeSlice*,CIMTimeSlice*>)
 
 ;; inclusive on low end and high end
 (bind-func find_tslice_range

@@ -8,8 +8,8 @@ $run_path = File::Spec->rel2abs($0);
 $run_dir = dirname($run_path);
 chdir($run_dir);
 
-#my $exe_path = which 'extempore';
-my $exe_path = "/Applications/extempore07/extempore";
+my $exe_path = which 'extempore';
+#my $exe_path = "/Applications/extempore07/extempore";
 my $exe_dir;
 
 if (defined($exe_path) && (-f $exe_path))
@@ -65,9 +65,9 @@ chomp $midi_output_device_number;
 
 my $cmd;
 if (defined ($audio_device_number)) {
-	$cmd = "$exe_path --device=$audio_device_number --midi-in=$midi_input_device_number --midi-out=$midi_output_device_number --run='$run_dir/runner.xtm'";
+	$cmd = "$exe_path --device=$audio_device_number --midi-in=$midi_input_device_number --midi-out=$midi_output_device_number --run-dir='$run_dir' --run='$run_dir/runner.xtm'";
 } else {
-	$cmd = "$exe_path --midi-in=$midi_input_device_number --midi-out=$midi_output_device_number --run='$run_dir/runner.xtm'";
+	$cmd = "$exe_path --midi-in=$midi_input_device_number --midi-out=$midi_output_device_number --run-dir='$run-dir' --run='$run_dir/runner.xtm'";
 }
 print "\n $cmd \n";
 exec($cmd);

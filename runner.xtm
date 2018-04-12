@@ -16,7 +16,7 @@
 ;; dependencies
 ;(sys:load "libs/external/portmidi.xtm")
 ;(sys:load "libs/external/midi_input.xtm")
-
+(sys:load "libs/contrib/ybot/ybot_midi.xtm")
 
 ;;;;;;;;;;;;;;;;;;;;; command line argument parsing ;;;;;;;;;;;;;;;;;;;;
 (define cmd-arg-true
@@ -36,6 +36,7 @@
 (define with-midicc? (cmd-arg-true "midicc"))
 (define with-osc? (cmd-arg-true "osc"))
 
+(define cwd (sys:cmdarg "run-dir"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; MIDI Setup ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -103,7 +104,7 @@
 ;;       (let* ((value (sys:cmdarg "midi-in"))
 ;;              (id (midi_input_port_id value)))
 ;;         (if (<= 0 id) id (string->number value)))
-;;       1))
+;;       1))  
 
 
 ;; (define (print-midi-setup)
@@ -121,20 +122,35 @@
 
 ;; midi initialization first!
 ;; cimlib overloads certain midi input funcs
-(if (<> 0 midi-in-port-id) (set_midi_in midi-in-port-id))
-(define *midi-out* (pm_create_output_stream midi-out-port-id))
-(bind-val midi_out PmStream*)
-(bind-func midi_out_in_xtlang:[void,i8*]*
-  (lambda (ptr:i8*)
-    (set! midi_out (cast ptr PmStream*))
-    void))
-(midi_out_in_xtlang *midi-out*)
-($ (println midi_out))
+
+;;(if (<> 0 midi-in-port-id) (set_midi_in midi-in-port-id))
+
+
+(define *midi-input-port-id*
+   (if (cmd-arg-true "midi-in") (string->number (sys:cmdarg "midi-in")) 0))
+(define *midi-output-port-id*
+   (if (cmd-arg-true "midi-out") (string->number (sys:cmdarg "midi-out")) 0))
+
+;(bind-val midi_input_port_id i64 0)
+;(bind-val midi_output_port_id i64 0)
+(bind-val mdm MIDIDeviceManager*)
+
+(bind-func setup_midi:[MIDIDeviceManager*,i64,i64]*
+  (lambda (input_id:i64 output_id:i64)
+    (set! mdm (midi_shazam input_id output_id))
+    (set! midi_in (get_default_input_stream mdm))
+    (set! midi_out (get_default_output_stream mdm))
+    mdm))
+
+(setup_midi *midi-input-port-id* *midi-input-port-id*)
+(bind-func hoist_midi_out:[i8*]* (lambda () midi_out))
+(define *midi-out* (hoist_midi_out))
+
 
 ;;(sys:load "../CIM_in_extempore/cimlib.xtm")
 ;(sys:load "/Users/andrew/Documents/code/CIM_in_extempore/cimlib.xtm")
 ;(sys:load "/Users/s978684/CIM_in_extempore/cimlib.xtm")
-(sys:load "/Users/s2805534/Documents/code/extempore/extempore-cim/CIM_in_extempore/cimlib.xtm")
+(sys:load (string-append cwd "/cimlib.xtm"))
 (sys:load "libs/core/pc_ivl.xtm")
 (if with-dsp? (sys:load "libs/external/instruments_ext.xtm"))
 
